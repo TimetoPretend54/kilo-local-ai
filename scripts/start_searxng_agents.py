@@ -1,3 +1,4 @@
+import sys
 import subprocess
 import time
 import os
@@ -6,11 +7,44 @@ from pathlib import Path
 LOCK_FILE = Path.home() / ".kilo_local_ai_searxng.lock"
 SEARXNG_COMPOSE_PATH = Path("./docker/searxng/docker-compose.yml")
 ENV_FILE = Path("./.env")
+FORCE = "--force" in sys.argv or "-f" in sys.argv
 
 def acquire_lock():
     if LOCK_FILE.exists():
-        print("SearxNG already running (lock file exists).")
-        exit(0)
+        if FORCE:
+            print("Force flag detected. Removing existing lock and continuing.")
+            LOCK_FILE.unlink()
+        else:
+            print("Lock file exists. Checking if agents are actually running...")
+
+            # Example check for Ollama
+            import socket
+            def is_port_open(host, port):
+                try:
+                    with socket.create_connection((host, port), timeout=1):
+                        return True
+                except OSError:
+                    return False
+
+            ollama_running = is_port_open("127.0.0.1", 11434)
+            import subprocess
+            searxng_running = False
+            try:
+                result = subprocess.run(
+                    ["docker-compose", "-f", str(SEARXNG_COMPOSE_PATH), "ps", "--filter", "name=searxng", "--format", "{{.Names}}"],
+                    capture_output=True, text=True
+                )
+                searxng_running = bool(result.stdout.strip())
+            except Exception:
+                pass
+
+            if not (ollama_running or searxng_running):
+                print("No agents detected. Removing stale lock file.")
+                LOCK_FILE.unlink()
+            else:
+                print("Agents already running. Use --force flag to remove lock. Exiting.")
+                exit(0)
+
     LOCK_FILE.write_text(str(os.getpid()))
 
 def release_lock():
