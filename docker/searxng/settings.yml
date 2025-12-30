@@ -1,0 +1,14 @@
+use_default_settings: true
+
+server:
+  bind_address: "0.0.0.0"
+  port: 8080
+  secret_key: "OVERRIDDEN_BY_ENV_VAR"
+  allowed_hosts:  # LOCALHOST SUPPORT ONLY
+    - "127.0.0.1"
+    - "::1"
+
+search:
+  formats:
+    - html
+    - json
